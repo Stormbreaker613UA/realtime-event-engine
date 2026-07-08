@@ -28,4 +28,9 @@ private:
 	std::mutex m_;
 };
 
+// Factory function for creating FileStorage
+IStoragePtr create_file_storage(const std::string& path) {
+	return std::make_shared<FileStorage>(path);
+}
+
 } // namespace storage
