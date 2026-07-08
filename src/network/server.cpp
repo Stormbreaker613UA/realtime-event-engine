@@ -1,85 +1,103 @@
 // server.cpp
+
 #include "server.hpp"
 
-#include <algorithm>
-
-namespace network {
-
-SessionPtr Server::create_session(const std::string& id)
+namespace network
 {
-	std::lock_guard<std::mutex> lk(mutex_);
-	auto it = sessions_.find(id);
-	if (it != sessions_.end()) return it->second;
 
-	auto s = std::make_shared<Session>(id);
-	if (default_handler_) s->set_message_handler(default_handler_);
-	sessions_.emplace(id, s);
-	return s;
-}
+    Server::SessionPtr Server::create_session(const std::string& id)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
 
-bool Server::remove_session(const std::string& id)
-{
-	std::lock_guard<std::mutex> lk(mutex_);
-	return sessions_.erase(id) > 0;
-}
+        if (auto it = sessions_.find(id); it != sessions_.end())
+            return it->second;
 
-bool Server::deliver_bytes(const std::string& id, const uint8_t* data, size_t len)
-{
-	SessionPtr s;
-	{
-		std::lock_guard<std::mutex> lk(mutex_);
-		auto it = sessions_.find(id);
-		if (it == sessions_.end()) return false;
-		s = it->second;
-	}
+        auto session = std::make_shared<Session>(id);
 
-	// deliver outside lock
-	s->on_receive(data, len);
-	return true;
-}
+        if (default_handler_)
+            session->set_message_handler(default_handler_);
 
-std::optional<Server::ByteVec> Server::prepare_send(const std::string& id, const ByteVec& payload)
-{
-	std::lock_guard<std::mutex> lk(mutex_);
-	auto it = sessions_.find(id);
-	if (it == sessions_.end()) return std::nullopt;
-	// framing is static and deterministic; use Session helper
-	return Session::prepare_send(payload);
-}
+        sessions_.emplace(id, session);
 
-std::vector<std::pair<std::string, Server::ByteVec>> Server::prepare_broadcast(const ByteVec& payload)
-{
-	std::vector<std::pair<std::string, ByteVec>> out;
-	std::vector<std::string> ids;
-	{
-		std::lock_guard<std::mutex> lk(mutex_);
-		ids.reserve(sessions_.size());
-		for (auto& kv : sessions_) ids.push_back(kv.first);
-	}
+        return session;
+    }
 
-	if (ids.empty()) return out;
+    bool Server::remove_session(const std::string& id)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return sessions_.erase(id) != 0;
+    }
 
-	// prepare framed payload once
-	ByteVec framed = Session::prepare_send(payload);
+    bool Server::deliver_bytes(const std::string& id,
+        const uint8_t* data,
+        std::size_t length)
+    {
+        SessionPtr session;
 
-	out.reserve(ids.size());
-	for (auto& id : ids) out.emplace_back(id, framed);
-	return out;
-}
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
 
-void Server::set_default_handler(Session::MessageHandler handler)
-{
-	std::lock_guard<std::mutex> lk(mutex_);
-	default_handler_ = handler;
-	for (auto& kv : sessions_) {
-		if (kv.second) kv.second->set_message_handler(default_handler_);
-	}
-}
+            auto it = sessions_.find(id);
+            if (it == sessions_.end())
+                return false;
 
-size_t Server::session_count() const
-{
-	std::lock_guard<std::mutex> lk(mutex_);
-	return sessions_.size();
-}
+            session = it->second;
+        }
+
+        // Process outside the mutex.
+        session->on_receive(data, length);
+
+        return true;
+    }
+
+    std::optional<Server::ByteVec>
+        Server::prepare_send(const std::string& id,
+            const ByteVec& payload)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (sessions_.find(id) == sessions_.end())
+            return std::nullopt;
+
+        return Session::prepare_send(payload);
+    }
+
+    std::vector<std::pair<std::string, Server::ByteVec>>
+        Server::prepare_broadcast(const ByteVec& payload)
+    {
+        std::vector<std::pair<std::string, ByteVec>> packets;
+
+        ByteVec framed = Session::prepare_send(payload);
+
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        packets.reserve(sessions_.size());
+
+        for (const auto& [id, session] : sessions_)
+        {
+            packets.emplace_back(id, framed);
+        }
+
+        return packets;
+    }
+
+    void Server::set_default_handler(Session::MessageHandler handler)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        default_handler_ = std::move(handler);
+
+        for (auto& [id, session] : sessions_)
+        {
+            if (session)
+                session->set_message_handler(default_handler_);
+        }
+    }
+
+    std::size_t Server::session_count() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return sessions_.size();
+    }
 
 } // namespace network

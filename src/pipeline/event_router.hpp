@@ -1,7 +1,8 @@
 // event_router.hpp
 #pragma once
 
-#include "../handlers/ihandler.hpp"
+#include "pipeline/handlers/ihandler.hpp"
+#include "core/event.hpp" 
 
 #include <memory>
 #include <string>

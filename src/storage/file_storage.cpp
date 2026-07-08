@@ -1,6 +1,6 @@
 // file_storage.cpp
-#include "../Storage/istorage.hpp"
-#include "../core/event.hpp"
+#include "storage/istorage.hpp"  
+#include "core/event.hpp"
 
 #include <fstream>
 #include <iomanip>

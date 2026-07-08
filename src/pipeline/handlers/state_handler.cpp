@@ -1,7 +1,7 @@
 // state_handler.cpp
 #include "state_handler.hpp"
-#include "../core/logger.hpp"
-#include "../core/event.hpp"
+#include "core/logger.hpp"
+#include "core/event.hpp"
 
 namespace handlers {
 

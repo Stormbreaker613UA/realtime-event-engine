@@ -1,7 +1,7 @@
 // auth_handler.cpp
 #include "auth_handler.hpp"
-#include "../core/logger.hpp"
-#include "../core/event.hpp"
+#include "core/logger.hpp"
+#include "core/event.hpp"
 
 namespace handlers {
 

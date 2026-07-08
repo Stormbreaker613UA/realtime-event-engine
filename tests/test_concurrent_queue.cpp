@@ -1,5 +1,5 @@
 // test_concurrent_queue.cpp
-#include "../core/concurrent_queue.hpp"
+#include "core/concurrent_queue.hpp"
 
 #include <cassert>
 #include <thread>

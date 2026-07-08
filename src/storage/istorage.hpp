@@ -1,7 +1,7 @@
 // istorage.hpp
 #pragma once
 
-#include "../core/event.hpp"
+#include "core/event.hpp"
 
 #include <memory>
 
